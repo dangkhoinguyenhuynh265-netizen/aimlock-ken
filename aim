@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NYNOX HUB // AIMLOCK PANEL</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --neon: #00ffc8;
+    --neon-2: #00ffe0;
+    --bg-0: #000305;
+    --bg-1: #02090f;
+    --bg-2: #041018;
+    --glow: 0 0 6px #00ffc8, 0 0 18px #00ffc8, 0 0 40px rgba(0,255,200,.45);
+  }
+
+  html, body {
+    width:100%; height:100%;
+    background: radial-gradient(circle at 50% 30%, #04141c 0%, #000305 70%);
+    color: var(--neon);
+    font-family: 'Courier New', Consolas, monospace;
+    overflow:hidden;
+    user-select:none;
+  }
+
+  /* ===== MATRIX CANVAS ===== */
+  #matrix {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: .45;
+  }
+
+  /* ===== SCANLINE OVERLAY ===== */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0,255,200,.04) 0px,
+      rgba(0,255,200,.04) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+  .vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 40%, rgba(0,0,0,.85) 100%);
+  }
+
+  /* ===== MAIN PANEL ===== */
+  .panel {
+    position: relative;
+    z-index: 2;
+    width: min(460px, 94vw);
+    margin: 20px auto;
+    background: linear-gradient(180deg, rgba(2,15,20,.92), rgba(0,5,8,.96));
+    border: 1px solid var(--neon);
+    border-radius: 6px;
+    box-shadow: var(--glow), inset 0 0 24px rgba(0,255,200,.08);
+    backdrop-filter: blur(4px);
+    overflow: hidden;
+  }
+
+  /* header */
+  .header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0,255,200,.35);
+    background: linear-gradient(90deg, rgba(0,255,200,.10), transparent);
+  }
+  .logo {
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-shadow: var(--glow);
+    font-weight: 700;
+  }
+  .logo span { color:#fff; }
+  .status-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #ff2d55;
+    box-shadow: 0 0 8px #ff2d55, 0 0 18px #ff2d55;
+    transition: .3s;
+  }
+  .status-dot.on {
+    background: var(--neon);
+    box-shadow: var(--glow);
+  }
+
+  /* body */
+  .body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* rows */
+  .row {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 9px 12px;
+    border: 1px solid rgba(0,255,200,.28);
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(0,255,200,.05), transparent);
+    box-shadow: inset 0 0 12px rgba(0,255,200,.06);
+    font-size: 12.5px;
+    letter-spacing: 1px;
+  }
+  .row .label { color: #9dfff0; text-shadow: 0 0 6px rgba(0,255,200,.5); }
+  .row .val   { color:#fff; text-shadow: var(--glow); font-weight: 700; }
+
+  /* FOV circle preview */
+  .fov-box {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 14px;
+    border: 1px solid rgba(0,255,200,.28);
+    border-radius: 4px;
+    background: radial-gradient(circle, rgba(0,255,200,.06), transparent 70%);
+    box-shadow: inset 0 0 18px rgba(0,255,200,.10);
+  }
+  .fov-ring {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    border: 2px dashed var(--neon);
+    box-shadow: var(--glow), inset 0 0 24px rgba(0,255,200,.20);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    animation: spin 12s linear infinite;
+  }
+  .fov-ring::after {
+    content:"";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--neon);
+    box-shadow: var(--glow);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* no recoil bar */
+  .bar {
+    position: relative;
+    height: 8px;
+    border: 1px solid rgba(0,255,200,.4);
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(0,255,200,.05);
+  }
+  .bar > i {
+    position:absolute; left:0; top:0; bottom:0;
+    width: 0%;
+    background: linear-gradient(90deg, #00ffc8, #00ffe0);
+    box-shadow: 0 0 10px var(--neon);
+    transition: width .35s ease;
+  }
+
+  /* big switch button */
+  .switch {
+    margin: 4px 14px 16px;
+    padding: 15px;
+    width: calc(100% - 28px);
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: var(--neon);
+    background: linear-gradient(180deg, rgba(0,255,200,.08), rgba(0,255,200,.02));
+    border: 1.5px solid var(--neon);
+    border-radius: 5px;
+    cursor: pointer;
+    text-shadow: var(--glow);
+    box-shadow: 0 0 12px rgba(0,255,200,.35), inset 0 0 12px rgba(0,255,200,.10);
+    transition: .25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .switch:hover {
+    background: linear-gradient(180deg, rgba(0,255,200,.18), rgba(0,255,200,.05));
+    box-shadow: 0 0 22px var(--neon), inset 0 0 20px rgba(0,255,200,.25);
+  }
+  .switch:active { transform: scale(.985); }
+  .switch.on {
+    color: #00130e;
+    background: linear-gradient(180deg, #00ffc8, #00c99e);
+    box-shadow: 0 0 26px var(--neon), 0 0 60px rgba(0,255,200,.55);
+  }
+  .switch::before {
+    content:"";
+    position:absolute; top:0; left:-100%;
+    width:100%; height:100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    transition: .6s;
+  }
+  .switch:hover::before { left:100%; }
+
+  /* footer */
+  .footer {
+    padding: 8px 14px;
+    border-top: 1px solid rgba(0,255,200,.25);
+    font-size: 10.5px;
+    letter-spacing: 2px;
+    color: rgba(0,255,200,.55);
+    display:flex;
+    justify-content:space-between;
+  }
+
+  /* flicker logo */
+  @keyframes flicker {
+    0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1}
+    96%{opacity:.6} 97%{opacity:1}
+  }
+  .logo { animation: flicker 6s infinite; }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<div class="panel">
+  <div class="header">
+    <div class="logo">NYNOX<span>//</span>HUB</div>
+    <div class="status-dot" id="dot"></div>
+  </div>
+
+  <div class="body">
+
+    <div class="row">
+      <span class="label">AIMLOCK</span>
+      <span class="val" id="v-aim">OFF</span>
+    </div>
+
+    <div class="row">
+      <span class="label">NO RECOIL (chống giật tâm)</span>
+      <span class="val" id="v-recoil">OFF</span>
+    </div>
+
+    <div class="row" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <div style="display:flex; justify-content:space-between;">
+        <span class="label">FOV RANGE</span>
+        <span class="val" id="v-fov">120°</span>
+      </div>
+      <div class="bar"><i id="bar-fov" style="width:60%"></i></div>
+    </div>
+
+    <div class="fov-box">
+      <div class="fov-ring"></div>
+    </div>
+
+    <div class="row">
+      <span class="label">SMOOTH</span>
+      <span class="val" id="v-smooth">0.88</span>
+    </div>
+
+    <div class="row">
+      <span class="label">TARGET BONE</span>
+      <span class="val">HEAD</span>
+    </div>
+
+  </div>
+
+  <button class="switch" id="toggle">[ KÍCH HOẠT HỆ THỐNG AIMLOCK ]</button>
+
+  <div class="footer">
+    <span id="sys-msg">SYSTEM STANDBY...</span>
+    <span id="clock">--:--:--</span>
+  </div>
+</div>
+
+<script>
+/* ================= MATRIX RAIN ================= */
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+
+function resize(){
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホNYNOXHUB{}[]//".split("");
+const fontSize = 14;
+let columns = Math.floor(canvas.width / fontSize);
+let drops = Array(columns).fill(1);
+
+window.addEventListener('resize', () => {
+  columns = Math.floor(canvas.width / fontSize);
+  drops = Array(columns).fill(1);
+});
+
+function drawMatrix(){
+  ctx.fillStyle = "rgba(0,3,5,0.08)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.font = fontSize + "px monospace";
+
+  for (let i = 0; i < drops.length; i++){
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    const x = i * fontSize;
+    const y = drops[i] * fontSize;
+
+    ctx.shadowColor = "#00ffc8";
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = Math.random() > 0.92 ? "#ffffff" : "#00ffc8";
+    ctx.fillText(text, x, y);
+    ctx.shadowBlur = 0;
+
+    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(drawMatrix, 55);
+
+/* ================= PANEL LOGIC ================= */
+const state = {
+  active: false,
+  fov: 120,
+  smooth: 0.88
+};
+
+const dot      = document.getElementById('dot');
+const toggle   = document.getElementById('toggle');
+const vAim     = document.getElementById('v-aim');
+const vRecoil  = document.getElementById('v-recoil');
+const vSmooth  = document.getElementById('v-smooth');
+const vFov     = document.getElementById('v-fov');
+const barFov   = document.getElementById('bar-fov');
+const sysMsg   = document.getElementById('sys-msg');
+const clock    = document.getElementById('clock');
+
+function logMsg(txt){
+  sysMsg.textContent = txt;
+}
+
+toggle.addEventListener('click', () => {
+  state.active = !state.active;
+
+  if (state.active){
+    toggle.classList.add('on');
+    toggle.textContent = '[ HỆ THỐNG ĐANG HOẠT ĐỘNG ]';
+    dot.classList.add('on');
+    vAim.textContent = 'ON';
+    vRecoil.textContent = 'ON';
+    vAim.style.color = '#00ffc8';
+    vRecoil.style.color = '#00ffc8';
+    logMsg('AIMLOCK ACTIVE // NO RECOIL LOCKED');
+    pulseFov();
+  } else {
+    toggle.classList.remove('on');
+    toggle.textContent = '[ KÍCH HOẠT HỆ THỐNG AIMLOCK ]';
+    dot.classList.remove('on');
+    vAim.textContent = 'OFF';
+    vRecoil.textContent = 'OFF';
+    vAim.style.color = '#fff';
+    vRecoil.style.color = '#fff';
+    logMsg('SYSTEM STANDBY...');
+  }
+});
+
+/* FOV pulse animation when active */
+function pulseFov(){
+  if (!state.active) return;
+  state.fov = 100 + Math.floor(Math.random() * 60);
+  vFov.textContent = state.fov + '°';
+  barFov.style.width = Math.min(100, state.fov / 2) + '%';
+}
+
+setInterval(() => {
+  if (!state.active) return;
+  pulseFov();
+  state.smooth = (0.80 + Math.random() * 0.15).toFixed(2);
+  vSmooth.textContent = state.smooth;
+
+  if (Math.random() > 0.7){
+    logMsg('TARGET LOCKED // HEAD // ' +
+      (90 + Math.random() * 10).toFixed(1) + '%');
+  }
+}, 900);
+
+/* live clock */
+setInterval(() => {
+  const d = new Date();
+  clock.textContent = d.toTimeString().slice(0, 8);
+}, 1000);
+</script>
+</body>
+</html>
